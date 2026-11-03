@@ -72,6 +72,8 @@ h2{font-size:19px;letter-spacing:-.02em}
 .state-label{color:var(--muted);font-size:12px}
 .stage-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:7px}
 .stage-actions .button{flex:1 1 125px}
+.download-link{display:inline-flex;align-self:start;font-weight:650;font-size:13px;text-decoration:underline;text-underline-offset:3px;color:var(--primary);padding:7px 0}
+.download-link[hidden]{display:none!important}
 .install-help{text-align:center;margin:19px 12px;color:var(--muted);line-height:1.55;font-size:12px}
 .footer{text-align:center;color:var(--muted);font-size:11px;letter-spacing:.04em;padding:19px;border-top:1px solid var(--line)}
 .camera-layer{position:fixed;inset:0;z-index:30;background:rgba(8,13,25,.96);color:#fff;display:grid;place-items:center;padding:env(safe-area-inset-top) 15px env(safe-area-inset-bottom)}
