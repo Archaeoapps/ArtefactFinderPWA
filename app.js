@@ -110,18 +110,47 @@ async function captureQr(which){
   }catch(e){setSetupNotice(e.message,true);}
 }
 async function importLocal(which,file){
-  if(!file)return;
-  const limit=which==='data'?25*1024*1024:8192;
-  if(file.size<=0||file.size>limit){
-    setSetupNotice('Selected file has an invalid size.',true);return;
+  if(!file||provisioning)return;
+  const isData=which==='data';
+  const limit=isData?25*1024*1024:8192;
+  setSetupNotice('Checking selected file…');
+  try{
+    if(file.size>limit)
+      throw new Error('Selected file is '+file.size.toLocaleString('en-US')+
+        ' bytes, exceeding the '+(isData?'25 MB':'8 KB')+' limit.');
+    // Some iOS Files providers report size=0 for files that can still be read.
+    // Check the bytes themselves rather than trusting File.size.
+    const bytes=await file.arrayBuffer();
+    if(bytes.byteLength===0)
+      throw new Error('The selected file is empty (0 bytes). Download the full encrypted .rfdb file first, then select it again.');
+    if(bytes.byteLength>limit)
+      throw new Error('The selected file exceeds the supported size.');
+    if(isData){
+      if(bytes.byteLength<36)
+        throw new Error('The selected encrypted file contains only '+
+          bytes.byteLength+' bytes. The download is incomplete.');
+      const signature=new TextDecoder().decode(bytes.slice(0,8));
+      if(signature!=='RFDATA01'){
+        const hint=signature.startsWith('PK')?'A ZIP archive was selected. Extract the .rfdb file first.':
+          signature.startsWith('<')?'A web page was selected instead of the encrypted .rfdb file.':
+          'The selected file is not the expected encrypted .rfdb package.';
+        throw new Error(hint);
+      }
+      checkBundle(bytes);
+      pending.dataFile=file;
+      pending.dataUrl=null;
+      setSetupNotice('Encrypted data verified ('+
+        bytes.byteLength.toLocaleString('en-US')+' bytes). Select the key next.');
+    }else{
+      const text=new TextDecoder().decode(bytes);
+      await importSecret(text);
+      pending.keyFile=file;pending.keyUrl=null;pending.keyText=null;
+      setSetupNotice('Key file verified. Ready to complete setup.');
+    }
+    refreshSetup();
+  }catch(e){
+    setSetupNotice(e?.message||'Unable to read the selected file.',true);
   }
-  if(which==='data'){
-    pending.dataFile=file;pending.dataUrl=null;
-  }else{
-    pending.keyFile=file;pending.keyUrl=null;pending.keyText=null;
-  }
-  refreshSetup();
-  setSetupNotice(which==='data'?'Encrypted file selected.':'Key file selected.');
 }
 async function download(url,asText=false){
   if(!url||new URL(url).protocol!=='https:')
@@ -154,7 +183,7 @@ async function download(url,asText=false){
 async function install(){
   if(provisioning)return;
   const dataSource=pending.dataFile||pending.dataUrl;
-  const keySource=pending.keyFile||pending.keyUrl;
+  const keySource=pending.keyText||pending.keyFile||pending.keyUrl;
   if(!dataSource||!keySource)return;
   provisioning=true;refreshSetup();
   setSetupNotice('Downloading and verifying encrypted data…');
