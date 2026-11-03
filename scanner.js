@@ -57,15 +57,7 @@ export async function scanQRCode(dialog,video,cancelButton,hint,allowKey=false) 
           finish(value);
           return;
         }
-        let address;
-        try{address=new URL(value);}catch{
-          hint.textContent=allowKey?'Scan an HTTPS link or a valid key QR.':'Scan an HTTPS download link.';
-          return;
-        }
-        if(address.protocol!=='https:'||address.username||address.password){
-          hint.textContent='Scan a secure HTTPS link.';return;
-        }
-        finish(address.href);
+        hint.textContent='Scan the administrator secret QR, not a download link.';
       }catch{
         hint.textContent='Unable to read the image. Move the camera closer.';
       }
