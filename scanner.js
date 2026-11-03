@@ -1,6 +1,6 @@
 let active=false;
 
-export async function scanQRCode(dialog,video,cancelButton,hint) {
+export async function scanQRCode(dialog,video,cancelButton,hint,allowKey=false) {
   if(active) return null;
   if(typeof window.jsQR!=='function')
     throw new Error('QR scanner is unavailable.');
@@ -51,8 +51,17 @@ export async function scanQRCode(dialog,video,cancelButton,hint) {
           {inversionAttempts:'attemptBoth'});
         if(!qr?.data)return;
         const value=qr.data.trim();
+        // A secret supplied directly by an administrator-controlled QR stays
+        // entirely local: no browser download or cross-origin request needed.
+        if(allowKey && /^RFKEY1:[A-Za-z0-9_-]{43}$/.test(value)){
+          finish(value);
+          return;
+        }
         let address;
-        try{address=new URL(value);}catch{return;}
+        try{address=new URL(value);}catch{
+          hint.textContent=allowKey?'Scan an HTTPS link or a valid key QR.':'Scan an HTTPS download link.';
+          return;
+        }
         if(address.protocol!=='https:'||address.username||address.password){
           hint.textContent='Scan a secure HTTPS link.';return;
         }
