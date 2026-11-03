@@ -219,8 +219,9 @@ function wire(){
 async function init(){
   initializeTheme();wire();setNeedsSetup();
   if('serviceWorker' in navigator){
-    try{await navigator.serviceWorker.register('./sw.js',{scope:'./'});}
-    catch{setSetupNotice('Offline app files could not be cached. Reload while online.',true);}
+    navigator.serviceWorker.register('./sw.js',{scope:'./'}).catch(()=>{
+      if(!records) setSetupNotice('Offline app files could not be cached. Reload while online.',true);
+    });
   }
   try {
     const stored=await loadVault();
