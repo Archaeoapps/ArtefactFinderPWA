@@ -1,0 +1,27 @@
+name: Validate
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate source syntax
+        run: |
+          for file in app.js crypto.js vault.js scanner.js sw.js; do node --check "$file"; done
+      - name: Verify package format
+        run: npm test
+      - name: Check public tree
+        run: |
+          test -s vendor/jsQR.js
+          test -s index.html
+          test -s icon-180.png
+          test -s icon-192.png
+          ! find . -type f \( -name '*.rfdb' -o -name '*Secret*' -o -name '*.sqlite' -o -name '*.db' \) | grep -q .
