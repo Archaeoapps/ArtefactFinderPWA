@@ -1,4 +1,4 @@
-const CACHE='rf-shell-2026-11-v1';
+const CACHE='rf-shell-2026-11-v2';
 const ROOT=new URL('./',self.registration.scope);
 const FILES=[
  './','./index.html','./styles.css','./app.js',
