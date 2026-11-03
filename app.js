@@ -7,7 +7,7 @@ const fmt = number => Number(number).toLocaleString('en-US');
 const PAGE_SIZE=80;
 let records=null,matched=[],shown=0,searchTimer=0;
 let provisioning=false;
-let pending={dataUrl:null,keyUrl:null,dataFile:null,keyFile:null};
+let pending={dataUrl:null,keyUrl:null,dataFile:null,keyFile:null,keyText:null};
 
 function normalize(value) {
   return String(value||'').trim().toLocaleLowerCase().replaceAll('ς','σ');
@@ -38,7 +38,7 @@ function setSetupNotice(message,error=false){
 }
 function setReady(data){
   records=data;
-  pending={dataUrl:null,keyUrl:null,dataFile:null,keyFile:null};
+  pending={dataUrl:null,keyUrl:null,dataFile:null,keyFile:null,keyText:null};
   $('setupScreen').hidden=true;
   $('searchScreen').hidden=false;
   $('searchInput').value='';
@@ -58,11 +58,29 @@ function setNeedsSetup(message=''){
   setSetupNotice(message);
   refreshSetup();
 }
+function directDownloadUrl(url){
+  const u=new URL(url);
+  if(u.protocol!=='https:' || u.username || u.password)
+    throw new Error('Only secure HTTPS links are supported.');
+  // Standard Nextcloud share-page links point to HTML; /download serves the file.
+  if(/^\\/s\\/[A-Za-z0-9_-]+\\/?$/.test(u.pathname))
+    u.pathname=u.pathname.replace(/\\/$/,'')+'/download';
+  return u.href;
+}
 function refreshSetup(){
   const hasData=!!(pending.dataUrl||pending.dataFile);
-  const hasKey=!!(pending.keyUrl||pending.keyFile);
-  $('dataState').textContent=hasData?'Ready to download / import':'Not selected';
-  $('keyState').textContent=hasKey?'Ready to download / import':'Not selected';
+  const hasKey=!!(pending.keyUrl||pending.keyFile||pending.keyText);
+  $('dataState').textContent=pending.dataFile?'Encrypted file selected':
+    pending.dataUrl?'Download link captured':'Not selected';
+  $('keyState').textContent=pending.keyText?'Key QR captured locally':
+    pending.keyFile?'Key file selected':pending.keyUrl?'Key link captured':'Not selected';
+  // Public file downloads can be opened normally, even when cross-origin fetch is blocked.
+  const dataOpen=$('openDataDownload');
+  dataOpen.hidden=!pending.dataUrl||!!pending.dataFile;
+  if(!dataOpen.hidden)dataOpen.href=directDownloadUrl(pending.dataUrl);
+  const keyOpen=$('openKeyDownload');
+  keyOpen.hidden=!pending.keyUrl||!!(pending.keyFile||pending.keyText);
+  if(!keyOpen.hidden)keyOpen.href=directDownloadUrl(pending.keyUrl);
   $('scanKey').disabled=!hasData||provisioning;
   $('installData').disabled=!hasData||!hasKey||provisioning;
   $('scanData').disabled=provisioning;
@@ -74,15 +92,18 @@ async function captureQr(which){
   setSetupNotice('');
   $('cameraTitle').textContent=which==='data'?'Scan data link':'Scan key link';
   try{
-    const url=await scanQRCode($('cameraLayer'),$('cameraVideo'),
-      $('cameraCancel'),$('cameraHint'));
-    if(!url)return;
+    const value=await scanQRCode($('cameraLayer'),$('cameraVideo'),
+      $('cameraCancel'),$('cameraHint'),which==='key');
+    if(!value)return;
     if(which==='data'){
-      pending.dataUrl=url;pending.dataFile=null;
-      setSetupNotice('Data link captured. Scan the key link next.');
+      pending.dataUrl=value;pending.dataFile=null;
+      setSetupNotice('Data link captured. If automatic download is blocked, use Open download, save the encrypted file in Files, then Choose file.');
+    }else if(value.startsWith('RFKEY1:')){
+      pending.keyText=value;pending.keyUrl=null;pending.keyFile=null;
+      setSetupNotice('Key captured directly from QR. No key file download required.');
     }else{
-      pending.keyUrl=url;pending.keyFile=null;
-      setSetupNotice('Key link captured. Ready to install.');
+      pending.keyUrl=value;pending.keyFile=null;pending.keyText=null;
+      setSetupNotice('Key link captured. If automatic download is blocked, open the download and import the key file.');
     }
     refreshSetup();
   }catch(e){setSetupNotice(e.message,true);}
@@ -96,7 +117,7 @@ async function importLocal(which,file){
   if(which==='data'){
     pending.dataFile=file;pending.dataUrl=null;
   }else{
-    pending.keyFile=file;pending.keyUrl=null;
+    pending.keyFile=file;pending.keyUrl=null;pending.keyText=null;
   }
   refreshSetup();
   setSetupNotice(which==='data'?'Encrypted file selected.':'Key file selected.');
@@ -107,12 +128,14 @@ async function download(url,asText=false){
   const controller=new AbortController();
   const timer=setTimeout(()=>controller.abort(),30000);
   try{
-    const response=await fetch(url,{
+    const response=await fetch(directDownloadUrl(url),{
       method:'GET',mode:'cors',credentials:'omit',
       cache:'no-store',redirect:'follow',
       referrerPolicy:'no-referrer',signal:controller.signal
     });
     if(!response.ok)throw new Error('The remote file could not be downloaded (HTTP '+response.status+').');
+    if((response.headers.get('content-type')||'').includes('text/html'))
+      throw new Error('The link returned a web page instead of a file. Open the download link and import the file from Files.');
     const length=Number(response.headers.get('content-length')||0);
     const limit=asText?8192:25*1024*1024;
     if(length>limit)throw new Error('The remote file is too large.');
@@ -123,7 +146,7 @@ async function download(url,asText=false){
   }catch(e){
     if(e.name==='AbortError')throw new Error('Download timed out. Check the network.');
     if(e instanceof TypeError)
-      throw new Error('Download blocked or inaccessible. Nextcloud may require CORS permission. Download both files using the browser, then import them from Files.');
+      throw new Error('This file host blocks direct downloads into the app. Tap Open download, save the file in iPhone Files, then Choose file. A key QR containing the key itself avoids a separate key download.');
     throw e;
   }finally{clearTimeout(timer);}
 }
@@ -137,7 +160,8 @@ async function install(){
   try{
     const bytes= pending.dataFile?await pending.dataFile.arrayBuffer():await download(pending.dataUrl,false);
     checkBundle(bytes);
-    const rawKey= pending.keyFile?await pending.keyFile.text():await download(pending.keyUrl,true);
+    const rawKey=pending.keyText || (pending.keyFile
+      ?await pending.keyFile.text():await download(pending.keyUrl,true));
     const key=await importSecret(rawKey);
     const data=await decryptBundle(bytes,key);
     setSetupNotice('Saving encrypted data on this device…');
