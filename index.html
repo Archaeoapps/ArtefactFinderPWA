@@ -45,10 +45,8 @@
               <strong>Encrypted data</strong>
               <span id="dataState" class="state-label">Not selected</span>
               <div class="stage-actions">
-                <button id="scanData" class="button secondary" type="button">Scan data QR</button>
-                <button id="importData" class="button quiet" type="button">Choose file</button>
+                <button id="importData" class="button secondary" type="button">Choose file</button>
               </div>
-              <a id="openDataDownload" class="download-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open download in Safari</a>
             </div>
           </div>
           <div class="setup-stage">
@@ -57,16 +55,14 @@
               <strong>Key</strong>
               <span id="keyState" class="state-label">Not selected</span>
               <div class="stage-actions">
-                <button id="scanKey" class="button secondary" type="button" disabled>Scan key QR</button>
-                <button id="importKey" class="button quiet" type="button">Choose file</button>
+                <button id="scanKey" class="button secondary" type="button" disabled>Scan secret QR</button>
               </div>
-              <a id="openKeyDownload" class="download-link" href="#" target="_blank" rel="noopener noreferrer" hidden>Open key download in Safari</a>
             </div>
           </div>
           <button id="installData" class="button primary full" type="button" disabled>Complete setup</button>
           <p id="setupNotice" class="notice" role="status" aria-live="polite" hidden></p>
         </div>
-        <p class="install-help">On iPhone: open this website in Safari, use Share → Add to Home Screen, then configure the installed app.</p>
+        <p class="install-help">Download the encrypted file into iPhone Files first. Then open the installed app, choose that file, and scan the administrator secret QR.</p>
       </section>
 
       <section id="searchScreen" class="search-screen" hidden>
@@ -105,6 +101,5 @@
     </div>
   </section>
   <input id="dataFile" type="file" accept=".rfdb,application/octet-stream" hidden>
-  <input id="keyFile" type="file" accept=".txt,text/plain" hidden>
 </body>
 </html>
