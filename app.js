@@ -62,9 +62,10 @@ function directDownloadUrl(url){
   const u=new URL(url);
   if(u.protocol!=='https:' || u.username || u.password)
     throw new Error('Only secure HTTPS links are supported.');
-  // Standard Nextcloud share-page links point to HTML; /download serves the file.
-  if(/^\\/s\\/[A-Za-z0-9_-]+\\/?$/.test(u.pathname))
-    u.pathname=u.pathname.replace(/\\/$/,'')+'/download';
+  // Convert a standard share page URL to the file download URL.
+  const parts=u.pathname.split('/').filter(Boolean);
+  if(parts.length===2 && parts[0]==='s' && /^[A-Za-z0-9_-]+$/.test(parts[1]))
+    u.pathname='/s/'+parts[1]+'/download';
   return u.href;
 }
 function refreshSetup(){
